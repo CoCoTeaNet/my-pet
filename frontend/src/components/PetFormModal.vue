@@ -4,6 +4,7 @@ import { NModal, NInput, NInputNumber, NDatePicker, NButton } from 'naive-ui'
 import api from '@/api'
 import type { Pet } from '@/types'
 import { useUiStore } from '@/stores/ui'
+import { resolveUrl } from '@/platform'
 
 const props = defineProps<{ show: boolean; pet: Pet | null }>()
 const emit = defineEmits<{
@@ -47,7 +48,7 @@ watch(
         weight: props.pet.weight ?? null,
         notes: props.pet.notes || '',
       }
-      avatarPreview.value = props.pet.avatar_url || ''
+      avatarPreview.value = resolveUrl(props.pet.avatar_url || '')
     } else {
       form.value = { name: '', breed: '', gender: '', birth_date: '', weight: null, notes: '' }
       avatarPreview.value = ''

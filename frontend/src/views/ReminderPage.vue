@@ -6,6 +6,7 @@ import api from '@/api'
 import type { Reminder } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { syncNotifications } from '@/services/notifications'
 import { dateKey, formatRelative, formatTimeOnly } from '@/utils/time'
 import ReminderFormModal from '@/components/ReminderFormModal.vue'
 
@@ -77,6 +78,7 @@ onMounted(async () => {
 async function load() {
   const { data } = await api.get(`/pets/${petId}/reminders`)
   items.value = data.items || []
+  syncNotifications().catch(() => {})
 }
 
 function openCreate() {

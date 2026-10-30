@@ -1,7 +1,9 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+import { isNative } from '@/platform'
 
 const router = createRouter({
-  history: createWebHistory(),
+  // 原生 App 从本地加载页面，深链接刷新会 404，因此用 hash 模式
+  history: isNative ? createWebHashHistory() : createWebHistory(),
   routes: [
     {
       path: '/login',

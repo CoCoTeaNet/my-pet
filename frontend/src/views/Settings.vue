@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { NInput, NInputNumber, NSelect, NButton, NModal, useDialog } from 'naive-ui'
+import { NInput, NInputNumber, NSelect, NButton, NModal, NSwitch, useDialog } from 'naive-ui'
 import api from '@/api'
 import type { AppSettings, NotificationLog, UserInfo } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { getServerUrl, isNative, setServerUrl } from '@/platform'
+import { isNotifyEnabled, setNotifyEnabled } from '@/services/notifications'
 import {
   formatRelative,
   passwordStrength,
@@ -20,6 +22,40 @@ const router = useRouter()
 const roleText = computed(() => (auth.user?.role === 'admin' ? '管理员' : '成员'))
 
 function logout() {
+  auth.clear()
+  router.replace('/login')
+}
+
+/* ---------- App（仅原生环境） ---------- */
+const serverAddr = ref(getServerUrl())
+const notifyOn = ref(isNotifyEnabled())
+const notifyBusy = ref(false)
+
+async function onNotifyChange(v: boolean) {
+  if (notifyBusy.value) return
+  notifyBusy.value = true
+  try {
+    const count = await setNotifyEnabled(v)
+    notifyOn.value = isNotifyEnabled()
+    ui.showBanner(notifyOn.value ? `已开启，${count} 条提醒将推送` : '已关闭通知')
+  } catch (err) {
+    notifyOn.value = false
+    dialog.error({ title: '开启失败', content: (err as Error).message, positiveText: '知道了' })
+  } finally {
+    notifyBusy.value = false
+  }
+}
+
+function saveServer() {
+  const prev = getServerUrl()
+  const next = setServerUrl(serverAddr.value)
+  if (!next) return
+  serverAddr.value = next
+  if (next === prev) {
+    ui.showBanner('已保存')
+    return
+  }
+  // 服务器换了，原 token 不再适用
   auth.clear()
   router.replace('/login')
 }
@@ -245,6 +281,25 @@ onMounted(async () => {
       <n-button quaternary class="section-btn logout-btn" @click="logout">退出登录</n-button>
     </div>
 
+    <!-- App 设置（仅安卓 App） -->
+    <div v-if="isNative" class="card section anim-item" style="--i: 1">
+      <div class="section-title">App 设置</div>
+      <div class="field-item">
+        <label class="field-label">服务器地址</label>
+        <div class="server-row">
+          <n-input v-model:value="serverAddr" placeholder="如 192.168.1.10:8080" />
+          <n-button size="small" @click="saveServer">保存</n-button>
+        </div>
+      </div>
+      <div class="switch-row">
+        <div>
+          <div class="switch-label">到期提醒通知</div>
+          <div class="switch-tip">按健康提醒的到期时间推送本机通知</div>
+        </div>
+        <n-switch :value="notifyOn" :loading="notifyBusy" @update:value="onNotifyChange" />
+      </div>
+    </div>
+
     <!-- 修改密码 -->
     <div class="card section anim-item" style="--i: 1">
       <div class="section-title">修改密码</div>
@@ -465,6 +520,35 @@ onMounted(async () => {
 .logout-btn {
   color: #999;
   width: 100%;
+}
+
+.server-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.server-row :deep(.n-input) {
+  flex: 1;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0 2px;
+}
+
+.switch-label {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.switch-tip {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-top: 2px;
 }
 
 .user-row {

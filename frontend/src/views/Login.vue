@@ -4,16 +4,42 @@ import { useRoute, useRouter } from 'vue-router'
 import { NInput, NButton } from 'naive-ui'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { isNative, setServerUrl } from '@/platform'
+import { syncNotifications } from '@/services/notifications'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const form = reactive({ username: '', password: '' })
+const form = reactive({ server: localStorage.getItem('my-pet-server') || '', username: '', password: '' })
+const serverError = ref('')
 const usernameError = ref('')
 const passwordError = ref('')
 const loginError = ref('')
 const submitting = ref(false)
+const testing = ref(false)
+const testTip = ref('')
+
+function validateServer() {
+  if (!isNative) return
+  serverError.value = form.server.trim() ? '' : '请输入服务器地址'
+}
+
+async function testConnection() {
+  validateServer()
+  testTip.value = ''
+  if (serverError.value || testing.value) return
+  testing.value = true
+  setServerUrl(form.server)
+  try {
+    await api.get('/ping')
+    testTip.value = '连接成功'
+  } catch {
+    testTip.value = '连接失败，请检查地址与网络'
+  } finally {
+    testing.value = false
+  }
+}
 
 function validateUsername() {
   usernameError.value = form.username.trim() ? '' : '请输入用户名'
@@ -24,17 +50,20 @@ function validatePassword() {
 }
 
 async function submit() {
+  validateServer()
   validateUsername()
   validatePassword()
   loginError.value = ''
-  if (usernameError.value || passwordError.value || submitting.value) return
+  if (serverError.value || usernameError.value || passwordError.value || submitting.value) return
   submitting.value = true
   try {
+    if (isNative) setServerUrl(form.server)
     const { data } = await api.post('/auth/login', {
       username: form.username.trim(),
       password: form.password,
     })
     auth.setAuth(data.token, data.user)
+    syncNotifications().catch(() => {})
     const redirect = (route.query.redirect as string) || '/'
     router.replace(redirect)
   } catch (err) {
@@ -51,6 +80,21 @@ async function submit() {
       <div class="login-logo" aria-hidden="true">🐾</div>
       <h1 class="login-title">我的宠物</h1>
       <p class="login-sub">记录毛孩子的每一天</p>
+
+      <div v-if="isNative" class="field-item">
+        <label class="field-label">服务器地址</label>
+        <div class="server-row">
+          <n-input
+            v-model:value="form.server"
+            placeholder="如 192.168.1.10:8080"
+            @blur="validateServer"
+            @keyup.enter="submit"
+          />
+          <n-button quaternary size="small" :loading="testing" @click="testConnection">测试</n-button>
+        </div>
+        <div v-if="serverError" class="field-error">{{ serverError }}</div>
+        <div v-else-if="testTip" class="server-tip" :class="{ ok: testTip === '连接成功' }">{{ testTip }}</div>
+      </div>
 
       <div class="field-item">
         <label class="field-label">用户名</label>
@@ -129,5 +173,25 @@ async function submit() {
 
 .login-btn {
   margin-top: 24px;
+}
+
+.server-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.server-row :deep(.n-input) {
+  flex: 1;
+}
+
+.server-tip {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+
+.server-tip.ok {
+  color: var(--success, #18a058);
 }
 </style>

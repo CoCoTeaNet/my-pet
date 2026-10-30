@@ -1,0 +1,60 @@
+name: 构建安卓 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 构建前端
+        run: npm run build
+
+      - name: 同步到安卓工程
+        run: npx cap sync android
+
+      - name: 安装 Android SDK 组件
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: 构建 Debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+        working-directory: frontend/android
+
+      - name: 重命名产物
+        run: |
+          mkdir -p ../apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             ../apk/my-pet-${GITHUB_SHA::7}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: my-pet-android-apk
+          path: apk/*.apk

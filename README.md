@@ -59,6 +59,21 @@ PORT=8080 go run .
 cd frontend && npm run dev
 ```
 
+## 安卓 App
+
+App 由 Capacitor 打包同一套 Vue 前端，与 Web 端共用 `frontend/dist`，无需维护两份界面。
+
+首次使用：登录页填写服务器地址（如 `192.168.1.10:8080`），点「测试」确认连通后再登录；地址可在「设置 → App 设置」修改，修改后需重新登录。开启「到期提醒通知」后，App 会按健康提醒的到期时间推送本机通知（安卓 13+ 首次开启需授权）。
+
+```bash
+# 本地构建（需 Android SDK 或 Android Studio）
+cd frontend && npm install && npm run build
+npx cap sync android
+npx cap open android     # 或 cd android && ./gradlew assembleDebug
+```
+
+不想装 Android SDK 时，推送到 `main` 或打 tag 会触发 GitHub Actions 自动构建，在 Actions 页面下载 `my-pet-android-apk` 产物即可（debug 签名包，可直接安装）。
+
 ## API 概览
 
 - 认证：`POST /api/auth/login`、`GET /api/auth/me`、`PUT /api/auth/password`

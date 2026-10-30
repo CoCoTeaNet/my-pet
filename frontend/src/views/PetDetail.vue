@@ -6,6 +6,7 @@ import api from '@/api'
 import type { FeedGroup, FoodType, LogEntry, Pet } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { resolveUrl } from '@/platform'
 import { formatDate, formatRelative, genderText } from '@/utils/time'
 import PetFormModal from '@/components/PetFormModal.vue'
 
@@ -105,7 +106,7 @@ function confirmDelete() {
     <!-- 头部：毛玻璃 -->
     <div class="hero card">
       <div class="hero-main">
-        <img v-if="pet.avatar_url" :src="pet.avatar_url" :alt="pet.name" class="avatar avatar-80" />
+        <img v-if="pet.avatar_url" :src="resolveUrl(pet.avatar_url)" :alt="pet.name" class="avatar avatar-80" />
         <div v-else class="avatar-fallback avatar-80">{{ pet.name.slice(0, 1) }}</div>
         <div class="hero-info">
           <div class="hero-name">{{ pet.name }}</div>

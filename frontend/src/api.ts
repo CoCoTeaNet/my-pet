@@ -1,13 +1,11 @@
 import axios from 'axios'
+import { getApiBase, goLogin } from '@/platform'
 
-// 联调说明：开发环境通过 vite.config.ts 将 /api 代理到 http://localhost:8080，
-// 无需 mock，启动后端后前端即可直连真实接口。
-const api = axios.create({
-  baseURL: '/api',
-  timeout: 15000,
-})
+// Web 端走 vite 代理的同源 /api；原生 App 端走用户在登录页填写的服务器地址
+const api = axios.create({ timeout: 15000 })
 
 api.interceptors.request.use((config) => {
+  config.baseURL = getApiBase()
   const token = localStorage.getItem('my-pet-token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -23,9 +21,7 @@ api.interceptors.response.use(
     if (status === 401) {
       localStorage.removeItem('my-pet-token')
       localStorage.removeItem('my-pet-user')
-      if (!location.pathname.startsWith('/login')) {
-        location.href = '/login'
-      }
+      goLogin()
     }
     return Promise.reject(new Error(message))
   },

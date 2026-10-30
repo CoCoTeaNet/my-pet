@@ -5,6 +5,7 @@ import api from '@/api'
 import type { Pet } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { resolveUrl } from '@/platform'
 import { ageText } from '@/utils/time'
 import PetFormModal from '@/components/PetFormModal.vue'
 
@@ -66,7 +67,7 @@ function onSaved(pet: Pet) {
         role="button"
         @click="router.push(`/pet/${p.id}`)"
       >
-        <img v-if="p.avatar_url" :src="p.avatar_url" :alt="p.name" class="avatar avatar-48" />
+        <img v-if="p.avatar_url" :src="resolveUrl(p.avatar_url)" :alt="p.name" class="avatar avatar-48" />
         <div v-else class="avatar-fallback avatar-48">{{ p.name.slice(0, 1) }}</div>
         <div class="pet-info">
           <div class="pet-name">{{ p.name }}</div>
