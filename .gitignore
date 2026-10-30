@@ -6,3 +6,5 @@ frontend/node_modules/
 frontend/dist/
 *.log
 my-pet.tar.gz
+*.apk
+my-pet.exe~
