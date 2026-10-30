@@ -1,0 +1,13 @@
+services:
+  my-pet:
+    build: .
+    container_name: my-pet
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=8080
+      - JWT_SECRET=my-pet-secret-key-2026
+      - DB_PATH=/app/data/my-pet.db
+    restart: unless-stopped
