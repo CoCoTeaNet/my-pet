@@ -1,6 +1,11 @@
 services:
   my-pet:
-    build: .
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: https://registry.npmmirror.com
+        GOPROXY: https://goproxy.cn,direct
+        APK_MIRROR: https://mirrors.aliyun.com
     container_name: my-pet
     ports:
       - "8080:8080"
