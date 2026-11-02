@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { CapacitorHttp } from '@capacitor/core'
 import { NInput, NButton, NSelect } from 'naive-ui'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -42,6 +43,15 @@ function validateServer() {
   serverError.value = form.host.trim() ? '' : '请输入服务器地址'
 }
 
+function connectErrorText(err: unknown) {
+  const msg = (err as Error)?.message || ''
+  if (/ssl|certificate|trust anchor|trust/i.test(msg)) return '证书不受信任，请检查 HTTPS 证书'
+  if (/timeout|timed out/i.test(msg)) return '请求超时，请检查地址和端口'
+  if (/cleartext/i.test(msg)) return '明文 HTTP 被系统拦截'
+  if (/unable to resolve host|dns/i.test(msg)) return '域名解析失败'
+  return msg || '网络错误'
+}
+
 async function testConnection() {
   applyDetectedScheme()
   validateServer()
@@ -50,10 +60,20 @@ async function testConnection() {
   testing.value = true
   const url = setServerUrl(buildServerUrl(form.scheme, form.host))
   try {
-    await api.get('/ping')
-    testTip.value = '连接成功'
-  } catch {
-    testTip.value = `连接失败：${url}`
+    if (isNative) {
+      // 走原生 OkHttp：不经过 WebView 的跨域与混合内容检查
+      const res = await CapacitorHttp.get({
+        url: `${url}/api/ping`,
+        connectTimeout: 10000,
+        readTimeout: 10000,
+      })
+      testTip.value = res.status >= 200 && res.status < 300 ? '连接成功' : `连接失败：HTTP ${res.status}`
+    } else {
+      await api.get('/ping')
+      testTip.value = '连接成功'
+    }
+  } catch (err) {
+    testTip.value = `连接失败：${connectErrorText(err)}`
   } finally {
     testing.value = false
   }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { CapacitorHttp } from '@capacitor/core'
 import { NInput, NInputNumber, NSelect, NButton, NModal, NSwitch, useDialog } from 'naive-ui'
 import api from '@/api'
 import type { AppSettings, NotificationLog, UserInfo } from '@/types'
@@ -172,15 +173,38 @@ async function testWebhook() {
   }
 }
 
+function base64ToBlob(b64: string) {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type: 'application/octet-stream' })
+}
+
 async function backup() {
   if (backingUp.value) return
   backingUp.value = true
   try {
-    const res = await api.post('/backup', null, { responseType: 'blob' })
-    const url = URL.createObjectURL(res.data)
+    let blob: Blob
+    let cd = ''
+    if (isNative) {
+      const token = localStorage.getItem('my-pet-token') || ''
+      const res = await CapacitorHttp.request({
+        url: `${getServerUrl()}/api/backup`,
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        responseType: 'blob',
+      })
+      if (res.status < 200 || res.status >= 300) throw new Error(`HTTP ${res.status}`)
+      blob = base64ToBlob(String(res.data))
+      cd = res.headers['content-disposition'] || res.headers['Content-Disposition'] || ''
+    } else {
+      const res = await api.post('/backup', null, { responseType: 'blob' })
+      blob = res.data
+      cd = res.headers['content-disposition'] || ''
+    }
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const cd: string = res.headers['content-disposition'] || ''
     const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i)
     a.download = m ? decodeURIComponent(m[1]) : `my-pet-backup-${new Date().toISOString().slice(0, 10)}.db`
     a.click()

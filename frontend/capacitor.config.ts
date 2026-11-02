@@ -9,6 +9,12 @@ const config: CapacitorConfig = {
     androidScheme: 'http',
     cleartext: true,
   },
+  plugins: {
+    // App 页面源是 http://localhost，接口是跨域请求；走原生 HTTP 绕开 WebView CORS
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
 }
 
 export default config
