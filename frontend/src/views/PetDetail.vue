@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDialog } from 'naive-ui'
 import api from '@/api'
 import type { FeedGroup, FoodType, LogEntry, Pet } from '@/types'
-import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { resolveUrl } from '@/platform'
 import { formatDate, formatRelative, genderText } from '@/utils/time'
@@ -12,7 +11,6 @@ import PetFormModal from '@/components/PetFormModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
 const ui = useUiStore()
 const dialog = useDialog()
 
@@ -113,7 +111,7 @@ function confirmDelete() {
           <div class="hero-meta">{{ pet.breed || '品种未填写' }}</div>
           <div class="hero-meta">{{ genderAgeLine || '信息未填写' }}</div>
         </div>
-        <div v-if="auth.isAdmin" class="more-wrap">
+        <div class="more-wrap">
           <button class="icon-btn" aria-label="更多" @click.stop="showMenu = !showMenu">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="1.8" />

@@ -6,7 +6,7 @@ import api from '@/api'
 import type { AppSettings, NotificationLog, UserInfo } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { getServerUrl, isNative, setServerUrl } from '@/platform'
+import { getServerUrl, isNative, parseServerUrl, buildServerUrl, setServerUrl, type ServerScheme } from '@/platform'
 import { isNotifyEnabled, setNotifyEnabled } from '@/services/notifications'
 import {
   formatRelative,
@@ -27,7 +27,13 @@ function logout() {
 }
 
 /* ---------- App（仅原生环境） ---------- */
-const serverAddr = ref(getServerUrl())
+const initialServer = parseServerUrl(getServerUrl())
+const serverScheme = ref<ServerScheme>(initialServer.scheme)
+const serverHost = ref(initialServer.host)
+const schemeOptions = [
+  { label: 'http', value: 'http' },
+  { label: 'https', value: 'https' },
+]
 const notifyOn = ref(isNotifyEnabled())
 const notifyBusy = ref(false)
 
@@ -48,9 +54,11 @@ async function onNotifyChange(v: boolean) {
 
 function saveServer() {
   const prev = getServerUrl()
-  const next = setServerUrl(serverAddr.value)
+  const next = setServerUrl(buildServerUrl(serverScheme.value, serverHost.value))
   if (!next) return
-  serverAddr.value = next
+  const parsed = parseServerUrl(next)
+  serverScheme.value = parsed.scheme
+  serverHost.value = parsed.host
   if (next === prev) {
     ui.showBanner('已保存')
     return
@@ -287,7 +295,8 @@ onMounted(async () => {
       <div class="field-item">
         <label class="field-label">服务器地址</label>
         <div class="server-row">
-          <n-input v-model:value="serverAddr" placeholder="如 192.168.1.10:8080" />
+          <n-select v-model:value="serverScheme" :options="schemeOptions" class="scheme-select" />
+          <n-input v-model:value="serverHost" placeholder="192.168.1.10:8080" />
           <n-button size="small" @click="saveServer">保存</n-button>
         </div>
       </div>
@@ -530,6 +539,12 @@ onMounted(async () => {
 
 .server-row :deep(.n-input) {
   flex: 1;
+  min-width: 0;
+}
+
+.scheme-select {
+  width: 88px;
+  flex-shrink: 0;
 }
 
 .switch-row {

@@ -1,17 +1,27 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NInput, NButton } from 'naive-ui'
+import { NInput, NButton, NSelect } from 'naive-ui'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import { isNative, setServerUrl } from '@/platform'
+import { buildServerUrl, isNative, parseServerUrl, setServerUrl, type ServerScheme } from '@/platform'
 import { syncNotifications } from '@/services/notifications'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const form = reactive({ server: localStorage.getItem('my-pet-server') || '', username: '', password: '' })
+const initialServer = parseServerUrl(localStorage.getItem('my-pet-server') || '')
+const form = reactive({
+  scheme: initialServer.scheme as ServerScheme,
+  host: initialServer.host,
+  username: '',
+  password: '',
+})
+const schemeOptions = [
+  { label: 'http', value: 'http' },
+  { label: 'https', value: 'https' },
+]
 const serverError = ref('')
 const usernameError = ref('')
 const passwordError = ref('')
@@ -22,7 +32,7 @@ const testTip = ref('')
 
 function validateServer() {
   if (!isNative) return
-  serverError.value = form.server.trim() ? '' : '请输入服务器地址'
+  serverError.value = form.host.trim() ? '' : '请输入服务器地址'
 }
 
 async function testConnection() {
@@ -30,7 +40,7 @@ async function testConnection() {
   testTip.value = ''
   if (serverError.value || testing.value) return
   testing.value = true
-  setServerUrl(form.server)
+  setServerUrl(buildServerUrl(form.scheme, form.host))
   try {
     await api.get('/ping')
     testTip.value = '连接成功'
@@ -57,7 +67,7 @@ async function submit() {
   if (serverError.value || usernameError.value || passwordError.value || submitting.value) return
   submitting.value = true
   try {
-    if (isNative) setServerUrl(form.server)
+    if (isNative) setServerUrl(buildServerUrl(form.scheme, form.host))
     const { data } = await api.post('/auth/login', {
       username: form.username.trim(),
       password: form.password,
@@ -84,9 +94,10 @@ async function submit() {
       <div v-if="isNative" class="field-item">
         <label class="field-label">服务器地址</label>
         <div class="server-row">
+          <n-select v-model:value="form.scheme" :options="schemeOptions" class="scheme-select" />
           <n-input
-            v-model:value="form.server"
-            placeholder="如 192.168.1.10:8080"
+            v-model:value="form.host"
+            placeholder="192.168.1.10:8080"
             @blur="validateServer"
             @keyup.enter="submit"
           />
@@ -183,6 +194,12 @@ async function submit() {
 
 .server-row :deep(.n-input) {
   flex: 1;
+  min-width: 0;
+}
+
+.scheme-select {
+  width: 88px;
+  flex-shrink: 0;
 }
 
 .server-tip {

@@ -4,10 +4,25 @@ export const isNative = Capacitor.isNativePlatform()
 
 const SERVER_KEY = 'my-pet-server'
 
+export type ServerScheme = 'http' | 'https'
+
 function normalizeServer(raw: string): string {
   const u = raw.trim().replace(/\/+$/, '')
   if (!u) return ''
   return /^https?:\/\//i.test(u) ? u : `http://${u}`
+}
+
+export function parseServerUrl(raw: string): { scheme: ServerScheme; host: string } {
+  const u = normalizeServer(raw)
+  if (!u) return { scheme: 'http', host: '' }
+  return u.toLowerCase().startsWith('https://')
+    ? { scheme: 'https', host: u.slice(8) }
+    : { scheme: 'http', host: u.slice(7) }
+}
+
+export function buildServerUrl(scheme: ServerScheme, host: string): string {
+  const h = host.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '')
+  return h ? `${scheme}://${h}` : ''
 }
 
 export function getServerUrl(): string {

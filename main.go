@@ -56,6 +56,10 @@ func main() {
 
 		auth.GET("/pets", h.ListPets)
 		auth.GET("/pets/:id", h.GetPet)
+		auth.POST("/pets", h.CreatePet)
+		auth.PUT("/pets/:id", h.UpdatePet)
+		auth.DELETE("/pets/:id", h.DeletePet)
+		auth.POST("/pets/:id/avatar", h.UploadAvatar)
 		auth.POST("/pets/:id/feeds", h.CreateFeed)
 		auth.GET("/pets/:id/feeds", h.ListFeeds)
 		auth.POST("/pets/:id/reminders", h.CreateReminder)
@@ -63,18 +67,14 @@ func main() {
 		auth.POST("/pets/:id/logs", h.CreateLog)
 		auth.GET("/pets/:id/logs", h.ListLogs)
 		auth.POST("/reminders/:id/complete", h.CompleteReminder)
+		auth.PUT("/reminders/:id", h.UpdateReminder)
+		auth.DELETE("/reminders/:id", h.DeleteReminder)
+		auth.DELETE("/feeds/:id", h.DeleteFeed)
+		auth.DELETE("/logs/:id", h.DeleteLog)
 	}
 
 	admin := auth.Group("", middleware.RequireAdmin())
 	{
-		admin.POST("/pets", h.CreatePet)
-		admin.PUT("/pets/:id", h.UpdatePet)
-		admin.DELETE("/pets/:id", h.DeletePet)
-		admin.POST("/pets/:id/avatar", h.UploadAvatar)
-		admin.DELETE("/feeds/:id", h.DeleteFeed)
-		admin.DELETE("/logs/:id", h.DeleteLog)
-		admin.PUT("/reminders/:id", h.UpdateReminder)
-		admin.DELETE("/reminders/:id", h.DeleteReminder)
 		admin.POST("/users", h.CreateUser)
 		admin.GET("/users", h.ListUsers)
 		admin.DELETE("/users/:id", h.DeleteUser)

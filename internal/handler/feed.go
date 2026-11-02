@@ -13,9 +13,7 @@ var foodTypes = map[string]bool{"dry": true, "wet": true, "treat": true}
 
 func (h *Handler) CreateFeed(c *gin.Context) {
 	petID := c.Param("id")
-	var pet model.Pet
-	if err := h.DB.First(&pet, "id = ?", petID).Error; err != nil {
-		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+	if _, ok := h.petOfCurrentUser(c, petID); !ok {
 		return
 	}
 	var req struct {
@@ -61,6 +59,9 @@ type feedGroup struct {
 
 func (h *Handler) ListFeeds(c *gin.Context) {
 	petID := c.Param("id")
+	if _, ok := h.petOfCurrentUser(c, petID); !ok {
+		return
+	}
 	page := parseIntDefault(c.Query("page"), 1)
 	pageSize := parseIntDefault(c.Query("page_size"), 100)
 	if page < 1 {
@@ -88,8 +89,12 @@ func (h *Handler) ListFeeds(c *gin.Context) {
 }
 
 func (h *Handler) DeleteFeed(c *gin.Context) {
-	res := h.DB.Delete(&model.FeedRecord{}, "id = ?", c.Param("id"))
-	if res.Error != nil || res.RowsAffected == 0 {
+	var rec model.FeedRecord
+	if err := h.DB.First(&rec, "id = ?", c.Param("id")).Error; err != nil || !h.ownsPet(c, rec.PetID) {
+		h.fail(c, http.StatusNotFound, "该条喂养信息不存在或已被删除")
+		return
+	}
+	if err := h.DB.Delete(&model.FeedRecord{}, "id = ?", rec.ID).Error; err != nil {
 		h.fail(c, http.StatusNotFound, "该条喂养信息不存在或已被删除")
 		return
 	}
@@ -102,9 +107,7 @@ var logTypes = map[string]bool{"behavior": true, "health": true, "other": true}
 
 func (h *Handler) CreateLog(c *gin.Context) {
 	petID := c.Param("id")
-	var pet model.Pet
-	if err := h.DB.First(&pet, "id = ?", petID).Error; err != nil {
-		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+	if _, ok := h.petOfCurrentUser(c, petID); !ok {
 		return
 	}
 	var req struct {
@@ -142,6 +145,9 @@ func (h *Handler) CreateLog(c *gin.Context) {
 
 func (h *Handler) ListLogs(c *gin.Context) {
 	petID := c.Param("id")
+	if _, ok := h.petOfCurrentUser(c, petID); !ok {
+		return
+	}
 	page := parseIntDefault(c.Query("page"), 1)
 	pageSize := parseIntDefault(c.Query("page_size"), 50)
 	if page < 1 {
@@ -159,8 +165,12 @@ func (h *Handler) ListLogs(c *gin.Context) {
 }
 
 func (h *Handler) DeleteLog(c *gin.Context) {
-	res := h.DB.Delete(&model.LogEntry{}, "id = ?", c.Param("id"))
-	if res.Error != nil || res.RowsAffected == 0 {
+	var entry model.LogEntry
+	if err := h.DB.First(&entry, "id = ?", c.Param("id")).Error; err != nil || !h.ownsPet(c, entry.PetID) {
+		h.fail(c, http.StatusNotFound, "该条日志不存在或已被删除")
+		return
+	}
+	if err := h.DB.Delete(&model.LogEntry{}, "id = ?", entry.ID).Error; err != nil {
 		h.fail(c, http.StatusNotFound, "该条日志不存在或已被删除")
 		return
 	}

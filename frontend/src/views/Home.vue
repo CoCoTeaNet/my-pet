@@ -3,14 +3,12 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import type { Pet } from '@/types'
-import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { resolveUrl } from '@/platform'
 import { ageText } from '@/utils/time'
 import PetFormModal from '@/components/PetFormModal.vue'
 
 const router = useRouter()
-const auth = useAuthStore()
 const ui = useUiStore()
 
 const loading = ref(true)
@@ -80,7 +78,7 @@ function onSaved(pet: Pet) {
       </div>
     </template>
 
-    <button v-if="auth.isAdmin" class="fab" type="button" @click="showForm = true">＋ 添加宠物</button>
+    <button class="fab" type="button" @click="showForm = true">＋ 添加宠物</button>
 
     <pet-form-modal v-model:show="showForm" :pet="null" @saved="onSaved" />
   </div>

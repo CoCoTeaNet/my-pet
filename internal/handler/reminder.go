@@ -19,9 +19,7 @@ type reminderReq struct {
 
 func (h *Handler) CreateReminder(c *gin.Context) {
 	petID := c.Param("id")
-	var pet model.Pet
-	if err := h.DB.First(&pet, "id = ?", petID).Error; err != nil {
-		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+	if _, ok := h.petOfCurrentUser(c, petID); !ok {
 		return
 	}
 	var req reminderReq
@@ -70,6 +68,9 @@ func withOverdue(r model.Reminder) gin.H {
 
 func (h *Handler) ListReminders(c *gin.Context) {
 	petID := c.Param("id")
+	if _, ok := h.petOfCurrentUser(c, petID); !ok {
+		return
+	}
 	var items []model.Reminder
 	h.DB.Where("pet_id = ?", petID).Find(&items)
 	out := make([]gin.H, 0, len(items))
@@ -91,7 +92,7 @@ func (h *Handler) ListReminders(c *gin.Context) {
 
 func (h *Handler) UpdateReminder(c *gin.Context) {
 	var r model.Reminder
-	if err := h.DB.First(&r, "id = ?", c.Param("id")).Error; err != nil {
+	if err := h.DB.First(&r, "id = ?", c.Param("id")).Error; err != nil || !h.ownsPet(c, r.PetID) {
 		h.fail(c, http.StatusNotFound, "提醒不存在或已被删除")
 		return
 	}
@@ -129,7 +130,7 @@ func (h *Handler) UpdateReminder(c *gin.Context) {
 
 func (h *Handler) CompleteReminder(c *gin.Context) {
 	var r model.Reminder
-	if err := h.DB.First(&r, "id = ?", c.Param("id")).Error; err != nil {
+	if err := h.DB.First(&r, "id = ?", c.Param("id")).Error; err != nil || !h.ownsPet(c, r.PetID) {
 		h.fail(c, http.StatusNotFound, "提醒不存在或已被删除")
 		return
 	}
@@ -144,8 +145,12 @@ func (h *Handler) CompleteReminder(c *gin.Context) {
 }
 
 func (h *Handler) DeleteReminder(c *gin.Context) {
-	res := h.DB.Delete(&model.Reminder{}, "id = ?", c.Param("id"))
-	if res.Error != nil || res.RowsAffected == 0 {
+	var r model.Reminder
+	if err := h.DB.First(&r, "id = ?", c.Param("id")).Error; err != nil || !h.ownsPet(c, r.PetID) {
+		h.fail(c, http.StatusNotFound, "提醒不存在或已被删除")
+		return
+	}
+	if err := h.DB.Delete(&model.Reminder{}, "id = ?", r.ID).Error; err != nil {
 		h.fail(c, http.StatusNotFound, "提醒不存在或已被删除")
 		return
 	}

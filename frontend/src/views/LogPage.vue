@@ -4,13 +4,11 @@ import { useRoute } from 'vue-router'
 import { NInput, NButton, useDialog } from 'naive-ui'
 import api from '@/api'
 import type { LogEntry, LogType, Pet } from '@/types'
-import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { formatRelative } from '@/utils/time'
 import SwipeRow from '@/components/SwipeRow.vue'
 
 const route = useRoute()
-const auth = useAuthStore()
 const ui = useUiStore()
 const dialog = useDialog()
 
@@ -139,7 +137,7 @@ function confirmDelete(log: LogEntry) {
       <swipe-row
         v-for="(log, i) in logs"
         :key="log.id"
-        :can-delete="auth.isAdmin"
+        :can-delete="true"
         class="log-row-wrap"
         @delete="confirmDelete(log)"
       >

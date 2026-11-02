@@ -16,6 +16,7 @@ const router = createRouter({
       component: () => import('@/components/AppLayout.vue'),
       children: [
         { path: '', name: 'home', component: () => import('@/views/Home.vue'), meta: { title: '我的宠物' } },
+        { path: 'reminders', name: 'reminders', component: () => import('@/views/RemindersPage.vue'), meta: { title: '健康提醒' } },
         { path: 'pet/:id', name: 'pet-detail', component: () => import('@/views/PetDetail.vue'), meta: { title: '宠物详情' } },
         { path: 'pet/:id/feed', name: 'pet-feed', component: () => import('@/views/FeedPage.vue'), meta: { title: '喂养记录' } },
         { path: 'pet/:id/log', name: 'pet-log', component: () => import('@/views/LogPage.vue'), meta: { title: '日志' } },

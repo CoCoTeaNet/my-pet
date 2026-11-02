@@ -4,13 +4,11 @@ import { useRoute } from 'vue-router'
 import { NSlider, NButton, useDialog } from 'naive-ui'
 import api from '@/api'
 import type { FeedGroup, FeedRecord, FoodType, Pet } from '@/types'
-import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { formatGroupTitle, formatTimeOnly } from '@/utils/time'
 import SwipeRow from '@/components/SwipeRow.vue'
 
 const route = useRoute()
-const auth = useAuthStore()
 const ui = useUiStore()
 const dialog = useDialog()
 
@@ -128,7 +126,7 @@ function confirmDelete(r: FeedRecord) {
       <swipe-row
         v-for="(r, ri) in g.records"
         :key="r.id"
-        :can-delete="auth.isAdmin"
+        :can-delete="true"
         class="feed-row-wrap"
         @delete="confirmDelete(r)"
       >

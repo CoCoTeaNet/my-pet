@@ -40,6 +40,10 @@ func buildFullEngine(h *Handler) *gin.Engine {
 		auth.PUT("/auth/password", h.ChangePassword)
 		auth.GET("/pets", h.ListPets)
 		auth.GET("/pets/:id", h.GetPet)
+		auth.POST("/pets", h.CreatePet)
+		auth.PUT("/pets/:id", h.UpdatePet)
+		auth.DELETE("/pets/:id", h.DeletePet)
+		auth.POST("/pets/:id/avatar", h.UploadAvatar)
 		auth.POST("/pets/:id/feeds", h.CreateFeed)
 		auth.GET("/pets/:id/feeds", h.ListFeeds)
 		auth.POST("/pets/:id/reminders", h.CreateReminder)
@@ -47,17 +51,13 @@ func buildFullEngine(h *Handler) *gin.Engine {
 		auth.POST("/pets/:id/logs", h.CreateLog)
 		auth.GET("/pets/:id/logs", h.ListLogs)
 		auth.POST("/reminders/:id/complete", h.CompleteReminder)
+		auth.PUT("/reminders/:id", h.UpdateReminder)
+		auth.DELETE("/reminders/:id", h.DeleteReminder)
+		auth.DELETE("/feeds/:id", h.DeleteFeed)
+		auth.DELETE("/logs/:id", h.DeleteLog)
 	}
 	admin := auth.Group("", middleware.RequireAdmin())
 	{
-		admin.POST("/pets", h.CreatePet)
-		admin.PUT("/pets/:id", h.UpdatePet)
-		admin.DELETE("/pets/:id", h.DeletePet)
-		admin.POST("/pets/:id/avatar", h.UploadAvatar)
-		admin.DELETE("/feeds/:id", h.DeleteFeed)
-		admin.DELETE("/logs/:id", h.DeleteLog)
-		admin.PUT("/reminders/:id", h.UpdateReminder)
-		admin.DELETE("/reminders/:id", h.DeleteReminder)
 		admin.POST("/users", h.CreateUser)
 		admin.GET("/users", h.ListUsers)
 		admin.DELETE("/users/:id", h.DeleteUser)
@@ -192,10 +192,10 @@ func TestAvatarUploadAndServe(t *testing.T) {
 	}
 	json.Unmarshal(w.Body.Bytes(), &resp)
 
-	// 成员不可上传头像
+	// 成员不能给他人宠物上传头像（按不存在处理）
 	member := loginAs(t, "member")
 	w, _ = upload(member)
-	if w.Code != 403 {
+	if w.Code != 404 {
 		t.Fatalf("member avatar: %d", w.Code)
 	}
 

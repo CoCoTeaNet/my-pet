@@ -47,6 +47,9 @@ func setupTest(t *testing.T) (*Handler, *gin.Engine) {
 		auth.GET("/auth/me", h.Me)
 		auth.GET("/pets", h.ListPets)
 		auth.GET("/pets/:id", h.GetPet)
+		auth.POST("/pets", h.CreatePet)
+		auth.PUT("/pets/:id", h.UpdatePet)
+		auth.DELETE("/pets/:id", h.DeletePet)
 		auth.POST("/pets/:id/feeds", h.CreateFeed)
 		auth.GET("/pets/:id/feeds", h.ListFeeds)
 		auth.POST("/pets/:id/reminders", h.CreateReminder)
@@ -54,16 +57,13 @@ func setupTest(t *testing.T) (*Handler, *gin.Engine) {
 		auth.POST("/pets/:id/logs", h.CreateLog)
 		auth.GET("/pets/:id/logs", h.ListLogs)
 		auth.POST("/reminders/:id/complete", h.CompleteReminder)
+		auth.PUT("/reminders/:id", h.UpdateReminder)
+		auth.DELETE("/reminders/:id", h.DeleteReminder)
+		auth.DELETE("/feeds/:id", h.DeleteFeed)
+		auth.DELETE("/logs/:id", h.DeleteLog)
 	}
 	admin := auth.Group("", middleware.RequireAdmin())
 	{
-		admin.POST("/pets", h.CreatePet)
-		admin.PUT("/pets/:id", h.UpdatePet)
-		admin.DELETE("/pets/:id", h.DeletePet)
-		admin.DELETE("/feeds/:id", h.DeleteFeed)
-		admin.DELETE("/logs/:id", h.DeleteLog)
-		admin.PUT("/reminders/:id", h.UpdateReminder)
-		admin.DELETE("/reminders/:id", h.DeleteReminder)
 		admin.POST("/users", h.CreateUser)
 		admin.GET("/users", h.ListUsers)
 		admin.DELETE("/users/:id", h.DeleteUser)
@@ -110,7 +110,7 @@ func tokenFor(t *testing.T, u *model.User) string {
 
 func loginAs(t *testing.T, role string) string {
 	t.Helper()
-	u := &model.User{Username: "u-" + role + string(rune(time.Now().UnixNano()%1000)), Role: role}
+	u := &model.User{ID: newID(), Username: "u-" + role + string(rune(time.Now().UnixNano()%1000)), Role: role}
 	if err := hashPassword(u, "testpass123"); err != nil {
 		t.Fatal(err)
 	}
@@ -293,42 +293,135 @@ func TestMemberPermissions(t *testing.T) {
 	_, r := setupTest(t)
 	admin := loginAs(t, "admin")
 	member := loginAs(t, "member")
-	_, body := doReq(t, r, "POST", "/api/pets", `{"name":"豆豆"}`, admin)
+
+	// 成员可以新增并管理自己的宠物
+	code, body := doReq(t, r, "POST", "/api/pets", `{"name":"成员的猫"}`, member)
+	if code != 200 {
+		t.Fatalf("member create pet: %d %s", code, body)
+	}
+	var own struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal([]byte(body), &own)
+
+	_, body = doReq(t, r, "POST", "/api/pets", `{"name":"管理员的狗"}`, admin)
+	var others struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal([]byte(body), &others)
+
+	// 成员访问管理员的宠物一律按不存在处理
+	denied := []struct{ m, p, b string }{
+		{"GET", "/api/pets/" + others.ID, ""},
+		{"PUT", "/api/pets/" + others.ID, `{"name":"改名"}`},
+		{"DELETE", "/api/pets/" + others.ID, ""},
+		{"GET", "/api/pets/" + others.ID + "/feeds", ""},
+		{"POST", "/api/pets/" + others.ID + "/feeds", `{"food_type":"dry","amount":50}`},
+		{"POST", "/api/pets/" + others.ID + "/logs", `{"content":"x"}`},
+		{"POST", "/api/pets/" + others.ID + "/reminders", `{"type":"驱虫","interval_days":30,"next_due_at":"2026-11-01"}`},
+	}
+	for _, tc := range denied {
+		if code, body := doReq(t, r, tc.m, tc.p, tc.b, member); code != 404 {
+			t.Errorf("member %s %s = %d, want 404 (%s)", tc.m, tc.p, code, body)
+		}
+	}
+
+	if code, body := doReq(t, r, "POST", "/api/pets/"+own.ID+"/feeds", `{"food_type":"dry","amount":50}`, member); code != 200 {
+		t.Errorf("member feed own pet: %d %s", code, body)
+	}
+	if code, body := doReq(t, r, "PUT", "/api/pets/"+own.ID, `{"name":"新名字"}`, member); code != 200 {
+		t.Errorf("member update own pet: %d %s", code, body)
+	}
+
+	// 管理员专属接口仍然 403
+	for _, p := range []string{"/api/users", "/api/settings"} {
+		if code, body := doReq(t, r, "GET", p, "", member); code != 403 {
+			t.Errorf("member GET %s = %d, want 403 (%s)", p, code, body)
+		}
+	}
+}
+
+func TestPetIsolation(t *testing.T) {
+	_, r := setupTest(t)
+	admin := loginAs(t, "admin")
+	member := loginAs(t, "member")
+
+	_, body := doReq(t, r, "POST", "/api/pets", `{"name":"管理员的狗"}`, admin)
+	var adminPet struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal([]byte(body), &adminPet)
+	doReq(t, r, "POST", "/api/pets", `{"name":"成员的猫"}`, member)
+
+	code, body := doReq(t, r, "GET", "/api/pets", "", admin)
+	if code != 200 || strings.Contains(body, "成员的猫") {
+		t.Fatalf("admin list should only contain own pet: %d %s", code, body)
+	}
+	var resp struct {
+		Items []model.Pet `json:"items"`
+		Total int         `json:"total"`
+	}
+	json.Unmarshal([]byte(body), &resp)
+	if resp.Total != 1 || len(resp.Items) != 1 || resp.Items[0].ID != adminPet.ID {
+		t.Fatalf("admin list wrong: %+v", resp)
+	}
+
+	code, body = doReq(t, r, "GET", "/api/pets", "", member)
+	if code != 200 || strings.Contains(body, "管理员的狗") || !strings.Contains(body, "成员的猫") {
+		t.Fatalf("member list should only contain own pet: %d %s", code, body)
+	}
+
+	// 跨用户操作子记录同样被拦截
+	var rem struct {
+		ID string `json:"id"`
+	}
+	_, body = doReq(t, r, "POST", "/api/pets/"+adminPet.ID+"/reminders", `{"type":"疫苗","interval_days":30,"next_due_at":"2026-11-01"}`, admin)
+	json.Unmarshal([]byte(body), &rem)
+	if code, _ := doReq(t, r, "POST", "/api/reminders/"+rem.ID+"/complete", "", member); code != 404 {
+		t.Errorf("member complete others reminder = %d, want 404", code)
+	}
+	if code, _ := doReq(t, r, "PUT", "/api/reminders/"+rem.ID, `{"type":"x","interval_days":1,"next_due_at":"2026-11-01"}`, member); code != 404 {
+		t.Errorf("member update others reminder = %d, want 404", code)
+	}
+	if code, _ := doReq(t, r, "DELETE", "/api/reminders/"+rem.ID, "", member); code != 404 {
+		t.Errorf("member delete others reminder = %d, want 404", code)
+	}
+	if code, _ := doReq(t, r, "POST", "/api/reminders/"+rem.ID+"/complete", "", admin); code != 200 {
+		t.Error("owner complete reminder failed")
+	}
+}
+
+func TestDeleteUserCascadesPets(t *testing.T) {
+	h, r := setupTest(t)
+	adminUser := &model.User{ID: newID(), Username: "theadmin", Role: "admin"}
+	if err := hashPassword(adminUser, "x1234567"); err != nil {
+		t.Fatal(err)
+	}
+	h.DB.Create(adminUser)
+	adminToken := tokenFor(t, adminUser)
+
+	_, body := doReq(t, r, "POST", "/api/users", `{"username":"spouse","password":"abc12345","role":"member"}`, adminToken)
+	var created struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal([]byte(body), &created)
+	memberToken := tokenFor(t, &model.User{ID: created.ID, Username: "spouse", Role: "member"})
+
+	_, body = doReq(t, r, "POST", "/api/pets", `{"name":"成员的猫"}`, memberToken)
 	var pet struct {
 		ID string `json:"id"`
 	}
 	json.Unmarshal([]byte(body), &pet)
-	doReq(t, r, "POST", "/api/pets/"+pet.ID+"/feeds", `{"food_type":"dry","amount":50}`, admin)
-	var feed struct {
-		ID string `json:"id"`
-	}
-	json.Unmarshal([]byte(body), &feed)
+	doReq(t, r, "POST", "/api/pets/"+pet.ID+"/feeds", `{"food_type":"dry","amount":20}`, memberToken)
 
-	forbidden := []struct{ m, p string }{
-		{"POST", "/api/pets"},
-		{"PUT", "/api/pets/" + pet.ID},
-		{"DELETE", "/api/pets/" + pet.ID},
-		{"DELETE", "/api/feeds/" + feed.ID},
-		{"GET", "/api/users"},
-		{"GET", "/api/settings"},
+	if code, _ := doReq(t, r, "DELETE", "/api/users/"+created.ID, "", adminToken); code != 200 {
+		t.Fatal("delete user failed")
 	}
-	for _, tc := range forbidden {
-		reqBody := ""
-		if tc.m == "PUT" || tc.m == "POST" {
-			reqBody = `{"name":"x"}`
-		}
-		if code, body := doReq(t, r, tc.m, tc.p, reqBody, member); code != 403 {
-			t.Errorf("member %s %s = %d, want 403 (%s)", tc.m, tc.p, code, body)
-		}
-	}
-	if code, _ := doReq(t, r, "POST", "/api/pets/"+pet.ID+"/feeds", `{"food_type":"treat","amount":5}`, member); code != 200 {
-		t.Error("member should create feeds")
-	}
-	if code, _ := doReq(t, r, "POST", "/api/pets/"+pet.ID+"/logs", `{"content":"hi"}`, member); code != 200 {
-		t.Error("member should create logs")
-	}
-	if code, _ := doReq(t, r, "POST", "/api/pets/"+pet.ID+"/reminders", `{"type":"洗澡","interval_days":30,"next_due_at":"2026-11-01"}`, member); code != 200 {
-		t.Error("member should create reminders")
+	var pets, feeds int64
+	h.DB.Model(&model.Pet{}).Where("owner_id = ?", created.ID).Count(&pets)
+	h.DB.Model(&model.FeedRecord{}).Where("pet_id = ?", pet.ID).Count(&feeds)
+	if pets != 0 || feeds != 0 {
+		t.Fatalf("pets/feeds not cascaded: pets=%d feeds=%d", pets, feeds)
 	}
 }
 

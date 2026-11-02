@@ -2,6 +2,8 @@ package handler
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -222,10 +224,34 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 		h.fail(c, http.StatusBadRequest, "不能删除自己")
 		return
 	}
-	res := h.DB.Delete(&model.User{}, "id = ?", id)
-	if res.Error != nil || res.RowsAffected == 0 {
+	var user model.User
+	if err := h.DB.First(&user, "id = ?", id).Error; err != nil {
 		h.fail(c, http.StatusNotFound, "用户不存在或已被删除")
 		return
+	}
+	var pets []model.Pet
+	h.DB.Where("owner_id = ?", id).Find(&pets)
+	petIDs := make([]string, 0, len(pets))
+	for _, p := range pets {
+		petIDs = append(petIDs, p.ID)
+	}
+	err := h.DB.Transaction(func(tx *gorm.DB) error {
+		if len(petIDs) > 0 {
+			tx.Where("pet_id IN ?", petIDs).Delete(&model.FeedRecord{})
+			tx.Where("pet_id IN ?", petIDs).Delete(&model.Reminder{})
+			tx.Where("pet_id IN ?", petIDs).Delete(&model.LogEntry{})
+			tx.Where("id IN ?", petIDs).Delete(&model.Pet{})
+		}
+		return tx.Delete(&model.User{}, "id = ?", id).Error
+	})
+	if err != nil {
+		h.fail(c, http.StatusInternalServerError, "删除失败，请重试")
+		return
+	}
+	for _, p := range pets {
+		if p.AvatarURL != "" {
+			os.Remove(filepath.Join(avatarDir, filepath.Base(p.AvatarURL)))
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "ok"})
 }

@@ -70,7 +70,7 @@ ck "创建日志" '"log_type":"behavior"' "$R"
 LOG=$(echo "$R" | sed 's/.*"id":"\([^"]*\)".*/\1/')
 R=$(J GET /pets/$PET/logs?page=1\&page_size=50); ck "日志列表" '"total":1' "$R"
 
-# 7. 成员权限
+# 7. 成员权限与数据隔离
 R=$(J POST /users '{"username":"mama","password":"weak"}'); ck "创建用户-弱密码被拒" "至少 8 位" "$R"
 R=$(J POST /users '{"username":"mama","password":"abc12345","role":"member"}')
 ck "创建成员" '"role":"member"' "$R"
@@ -78,15 +78,28 @@ R=$(req POST /auth/login '{"username":"mama","password":"abc12345"}')
 MTOKEN=$(echo "$R" | sed 's/.*"token":"\([^"]*\)".*/\1/')
 M() { local m=$1 p=$2 d=$3; req "$m" "$p" "$d" "$MTOKEN"; }
 [ -n "$MTOKEN" ] && echo "成员登录 OK" || { echo "成员登录失败: $R"; exit 1; }
-R=$(M DELETE /pets/$PET); ck "成员删宠物被拒" "仅管理员" "$R"
-R=$(M PUT /pets/$PET '{"name":"x"}'); ck "成员改宠物被拒" "仅管理员" "$R"
-R=$(M DELETE /feeds/$FEED); ck "成员删喂养被拒" "仅管理员" "$R"
-R=$(M DELETE /logs/$LOG); ck "成员删日志被拒" "仅管理员" "$R"
-R=$(M DELETE /reminders/$REM); ck "成员删提醒被拒" "仅管理员" "$R"
-R=$(M POST /pets/$PET/feeds '{"food_type":"treat","amount":10}'); ck "成员可添加喂养" '"food_type":"treat"' "$R"
-R=$(M POST /pets/$PET/logs '{"content":"成员写的日志","log_type":"health"}'); ck "成员可添加日志" "成员写的日志" "$R"
-R=$(M POST /reminders/$REM/complete); ck "成员可完成提醒" '"next_due_at"' "$R"
-R=$(M POST /pets '{"name":"偷建"}'); ck "成员建宠物被拒" "仅管理员" "$R"
+# 他人宠物对成员不可见（统一 404，不泄露存在性）
+R=$(M GET /pets/$PET); ck "成员看不到他人宠物" "宠物不存在" "$R"
+R=$(M PUT /pets/$PET '{"name":"x"}'); ck "成员改他人宠物被拒" "宠物不存在" "$R"
+R=$(M GET /pets/$PET/feeds); ck "成员看他人喂养被拒" "宠物不存在" "$R"
+R=$(M POST /pets/$PET/feeds '{"food_type":"treat","amount":10}'); ck "成员给他人宠物喂食被拒" "宠物不存在" "$R"
+R=$(M GET /pets/$PET/reminders); ck "成员看他人提醒被拒" "宠物不存在" "$R"
+R=$(M DELETE /reminders/$REM); ck "成员删他人提醒被拒" "提醒不存在" "$R"
+R=$(M GET /pets); ck "成员宠物列表为空" '"total":0' "$R"
+# 成员可完整管理自己的宠物
+R=$(M POST /pets '{"name":"成员的猫","breed":"狸花","gender":"female"}')
+ck "成员可创建宠物" '"name":"成员的猫"' "$R"
+MPET=$(echo "$R" | sed 's/.*"id":"\([^"]*\)".*/\1/')
+R=$(M POST /pets/$MPET/feeds '{"food_type":"treat","amount":10}'); ck "成员可添加喂养" '"food_type":"treat"' "$R"
+R=$(M POST /pets/$MPET/logs '{"content":"成员写的日志","log_type":"health"}'); ck "成员可添加日志" "成员写的日志" "$R"
+R=$(M POST /pets/$MPET/reminders "{\"type\":\"洗澡\",\"interval_days\":7,\"next_due_at\":\"$TOMORROW\"}")
+ck "成员可创建提醒" '"type":"洗澡"' "$R"
+MREM=$(echo "$R" | sed 's/.*"id":"\([^"]*\)".*/\1/')
+R=$(M POST /reminders/$MREM/complete); ck "成员可完成提醒" '"next_due_at"' "$R"
+R=$(M PUT /pets/$MPET '{"name":"成员的猫","breed":"狸花","gender":"female","birth_date":"2024-01-01","weight":4,"notes":""}')
+ck "成员可编辑自己的宠物" '"weight":4' "$R"
+R=$(M DELETE /pets/$MPET); ck "成员可删除自己的宠物" '"message":"ok"' "$R"
+# 管理端接口仍仅管理员可用
 R=$(M GET /users); ck "成员看用户列表被拒" "仅管理员" "$R"
 R=$(M GET /settings); ck "成员看设置被拒" "仅管理员" "$R"
 
@@ -120,10 +133,10 @@ ck "备份文件为 SQLite" "SQLite" "$R"
 
 # 12. 未登录与 SPA
 R=$(req GET /pets); ck "未登录被拒" "未登录" "$R"
-R=$(curl -s http://localhost:18080/nonexist-route); ck "SPA fallback 返回 HTML" "<!DOCTYPE html>" "$R"
+R=$(curl -s http://localhost:18080/nonexist-route); ck "SPA fallback 返回 HTML" "<!doctype html>" "$R"
 
 # 13. 删除宠物级联
-R=$(J GET /pets/$PET); ck "删除前统计" '"feed_count":2' "$R"
+R=$(J GET /pets/$PET); ck "删除前统计" '"feed_count":1' "$R"
 R=$(J DELETE /pets/$PET); ck "删除宠物" '"message":"ok"' "$R"
 R=$(J GET /pets); ck "删除后列表为空" '"total":0' "$R"
 

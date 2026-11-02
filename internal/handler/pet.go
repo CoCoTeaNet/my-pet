@@ -46,6 +46,7 @@ func (h *Handler) CreatePet(c *gin.Context) {
 	}
 	pet := model.Pet{
 		ID:        newID(),
+		OwnerID:   currentUserID(c),
 		Name:      strings.TrimSpace(req.Name),
 		Breed:     req.Breed,
 		Gender:    req.Gender,
@@ -72,16 +73,17 @@ func (h *Handler) ListPets(c *gin.Context) {
 		pageSize = 50
 	}
 	var total int64
-	h.DB.Model(&model.Pet{}).Count(&total)
+	uid := currentUserID(c)
+	h.DB.Model(&model.Pet{}).Where("owner_id = ?", uid).Count(&total)
 	var pets []model.Pet
-	h.DB.Order("created_at ASC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&pets)
+	h.DB.Where("owner_id = ?", uid).Order("created_at ASC").
+		Offset((page - 1) * pageSize).Limit(pageSize).Find(&pets)
 	c.JSON(http.StatusOK, gin.H{"items": pets, "total": total})
 }
 
 func (h *Handler) GetPet(c *gin.Context) {
-	var pet model.Pet
-	if err := h.DB.First(&pet, "id = ?", c.Param("id")).Error; err != nil {
-		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+	pet, ok := h.petOfCurrentUser(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	var stats model.PetStats
@@ -97,9 +99,8 @@ func (h *Handler) GetPet(c *gin.Context) {
 }
 
 func (h *Handler) UpdatePet(c *gin.Context) {
-	var pet model.Pet
-	if err := h.DB.First(&pet, "id = ?", c.Param("id")).Error; err != nil {
-		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+	pet, ok := h.petOfCurrentUser(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	var req petReq
@@ -134,12 +135,11 @@ func (h *Handler) UpdatePet(c *gin.Context) {
 }
 
 func (h *Handler) DeletePet(c *gin.Context) {
-	id := c.Param("id")
-	var pet model.Pet
-	if err := h.DB.First(&pet, "id = ?", id).Error; err != nil {
-		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+	pet, ok := h.petOfCurrentUser(c, c.Param("id"))
+	if !ok {
 		return
 	}
+	id := pet.ID
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
 		tx.Where("pet_id = ?", id).Delete(&model.FeedRecord{})
 		tx.Where("pet_id = ?", id).Delete(&model.Reminder{})
@@ -158,10 +158,8 @@ func (h *Handler) DeletePet(c *gin.Context) {
 }
 
 func (h *Handler) UploadAvatar(c *gin.Context) {
-	id := c.Param("id")
-	var pet model.Pet
-	if err := h.DB.First(&pet, "id = ?", id).Error; err != nil {
-		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+	pet, ok := h.petOfCurrentUser(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAvatarSize)

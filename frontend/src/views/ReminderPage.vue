@@ -4,14 +4,12 @@ import { useRoute } from 'vue-router'
 import { NCheckbox, useDialog } from 'naive-ui'
 import api from '@/api'
 import type { Reminder } from '@/types'
-import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { syncNotifications } from '@/services/notifications'
 import { dateKey, formatRelative, formatTimeOnly } from '@/utils/time'
 import ReminderFormModal from '@/components/ReminderFormModal.vue'
 
 const route = useRoute()
-const auth = useAuthStore()
 const ui = useUiStore()
 const dialog = useDialog()
 
@@ -182,7 +180,7 @@ function confirmDelete(r: Reminder) {
         </div>
         <div class="reminder-side">
           <n-checkbox @update:checked="() => complete(r)">完成</n-checkbox>
-          <div v-if="auth.isAdmin" class="reminder-ops">
+          <div class="reminder-ops">
             <button class="text-btn" @click="openEdit(r)">编辑</button>
             <button class="text-btn danger" @click="confirmDelete(r)">删除</button>
           </div>

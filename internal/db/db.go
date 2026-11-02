@@ -32,7 +32,22 @@ func Open(dbPath string) (*gorm.DB, error) {
 		return nil, err
 	}
 	seed(g)
+	migratePetOwner(g)
 	return g, nil
+}
+
+// migratePetOwner 存量宠物没有归属人，统一划给最早创建的管理员
+func migratePetOwner(g *gorm.DB) {
+	var count int64
+	g.Model(&model.Pet{}).Where("owner_id = ? OR owner_id IS NULL", "").Count(&count)
+	if count == 0 {
+		return
+	}
+	var admin model.User
+	if err := g.Where("role = ?", "admin").Order("created_at ASC").First(&admin).Error; err != nil {
+		return
+	}
+	g.Model(&model.Pet{}).Where("owner_id = ? OR owner_id IS NULL", "").Update("owner_id", admin.ID)
 }
 
 func seed(g *gorm.DB) {

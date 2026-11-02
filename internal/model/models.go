@@ -24,6 +24,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 
 type Pet struct {
 	ID        string    `gorm:"primaryKey;size:36" json:"id"`
+	OwnerID   string    `gorm:"index;size:36" json:"owner_id"`
 	Name      string    `gorm:"size:100;not null" json:"name"`
 	Breed     string    `gorm:"size:100" json:"breed"`
 	Gender    string    `gorm:"size:10" json:"gender"`
