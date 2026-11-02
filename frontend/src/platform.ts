@@ -25,6 +25,14 @@ export function buildServerUrl(scheme: ServerScheme, host: string): string {
   return h ? `${scheme}://${h}` : ''
 }
 
+// 用户常直接粘贴完整网址：以输入里的协议为准，并同步回下拉框
+export function splitServerInput(scheme: ServerScheme, raw: string): { scheme: ServerScheme; host: string } {
+  const value = raw.trim()
+  const m = value.match(/^(https?):\/\//i)
+  if (!m) return { scheme, host: value }
+  return { scheme: m[1].toLowerCase() as ServerScheme, host: value.slice(m[0].length) }
+}
+
 export function getServerUrl(): string {
   return localStorage.getItem(SERVER_KEY) || ''
 }

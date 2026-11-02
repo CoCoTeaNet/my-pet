@@ -6,7 +6,7 @@ import api from '@/api'
 import type { AppSettings, NotificationLog, UserInfo } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { getServerUrl, isNative, parseServerUrl, buildServerUrl, setServerUrl, type ServerScheme } from '@/platform'
+import { getServerUrl, isNative, parseServerUrl, buildServerUrl, setServerUrl, splitServerInput, type ServerScheme } from '@/platform'
 import { isNotifyEnabled, setNotifyEnabled } from '@/services/notifications'
 import {
   formatRelative,
@@ -54,7 +54,8 @@ async function onNotifyChange(v: boolean) {
 
 function saveServer() {
   const prev = getServerUrl()
-  const next = setServerUrl(buildServerUrl(serverScheme.value, serverHost.value))
+  const detected = splitServerInput(serverScheme.value, serverHost.value)
+  const next = setServerUrl(buildServerUrl(detected.scheme, detected.host))
   if (!next) return
   const parsed = parseServerUrl(next)
   serverScheme.value = parsed.scheme

@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { NInput, NButton, NSelect } from 'naive-ui'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import { buildServerUrl, isNative, parseServerUrl, setServerUrl, type ServerScheme } from '@/platform'
+import { buildServerUrl, isNative, parseServerUrl, setServerUrl, splitServerInput, type ServerScheme } from '@/platform'
 import { syncNotifications } from '@/services/notifications'
 
 const router = useRouter()
@@ -30,22 +30,30 @@ const submitting = ref(false)
 const testing = ref(false)
 const testTip = ref('')
 
+function applyDetectedScheme() {
+  const next = splitServerInput(form.scheme, form.host)
+  form.scheme = next.scheme
+  form.host = next.host
+}
+
 function validateServer() {
   if (!isNative) return
+  applyDetectedScheme()
   serverError.value = form.host.trim() ? '' : '请输入服务器地址'
 }
 
 async function testConnection() {
+  applyDetectedScheme()
   validateServer()
   testTip.value = ''
   if (serverError.value || testing.value) return
   testing.value = true
-  setServerUrl(buildServerUrl(form.scheme, form.host))
+  const url = setServerUrl(buildServerUrl(form.scheme, form.host))
   try {
     await api.get('/ping')
     testTip.value = '连接成功'
   } catch {
-    testTip.value = '连接失败，请检查地址与网络'
+    testTip.value = `连接失败：${url}`
   } finally {
     testing.value = false
   }
@@ -60,6 +68,7 @@ function validatePassword() {
 }
 
 async function submit() {
+  applyDetectedScheme()
   validateServer()
   validateUsername()
   validatePassword()
@@ -97,14 +106,14 @@ async function submit() {
           <n-select v-model:value="form.scheme" :options="schemeOptions" class="scheme-select" />
           <n-input
             v-model:value="form.host"
-            placeholder="192.168.1.10:8080"
+            placeholder="192.168.1.10:8080（可粘贴完整网址）"
             @blur="validateServer"
             @keyup.enter="submit"
           />
           <n-button quaternary size="small" :loading="testing" @click="testConnection">测试</n-button>
         </div>
         <div v-if="serverError" class="field-error">{{ serverError }}</div>
-        <div v-else-if="testTip" class="server-tip" :class="{ ok: testTip === '连接成功' }">{{ testTip }}</div>
+        <div v-else-if="testTip" class="server-tip" :class="testTip === '连接成功' ? 'ok' : 'err'">{{ testTip }}</div>
       </div>
 
       <div class="field-item">
@@ -210,5 +219,9 @@ async function submit() {
 
 .server-tip.ok {
   color: var(--success, #18a058);
+}
+
+.server-tip.err {
+  color: var(--danger);
 }
 </style>
