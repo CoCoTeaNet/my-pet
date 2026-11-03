@@ -17,7 +17,13 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     const status = err?.response?.status
-    const message: string = err?.response?.data?.error || '网络超时，请重试'
+    let message: string = err?.response?.data?.error
+    if (!message) {
+      if (status === 413) message = '上传内容过大（HTTP 413）'
+      else if (status) message = `请求失败（HTTP ${status}）`
+      else if (/timeout/i.test(err?.message || '')) message = '请求超时，请重试'
+      else message = '网络连接失败，请检查服务器地址'
+    }
     if (status === 401) {
       localStorage.removeItem('my-pet-token')
       localStorage.removeItem('my-pet-user')

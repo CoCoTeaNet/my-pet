@@ -64,19 +64,53 @@ function onPickAvatar() {
   fileInput.value?.click()
 }
 
-function onFileChange(e: Event) {
+async function compressImage(file: File): Promise<File> {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file
+  try {
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height))
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, width, height)
+    bitmap.close()
+    let blob: Blob | null = null
+    for (const quality of [0.85, 0.7, 0.55]) {
+      blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+      if (blob && blob.size <= 900 * 1024) break
+    }
+    if (!blob || blob.size >= file.size) return file
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  } catch {
+    return file
+  }
+}
+
+async function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const f = input.files?.[0]
+  input.value = ''
   if (!f) return
-  if (f.size > 2 * 1024 * 1024) {
-    avatarError.value = '头像不能超过 2MB'
-    input.value = ''
+  if (!f.type.startsWith('image/')) {
+    avatarError.value = '请选择图片文件'
+    return
+  }
+  if (f.size > 20 * 1024 * 1024) {
+    avatarError.value = '图片不能超过 20MB'
     return
   }
   avatarError.value = ''
-  avatarFile.value = f
-  avatarPreview.value = URL.createObjectURL(f)
-  input.value = ''
+  const compressed = await compressImage(f)
+  if (compressed.size > 2 * 1024 * 1024) {
+    avatarError.value = '头像不能超过 2MB'
+    return
+  }
+  avatarFile.value = compressed
+  avatarPreview.value = URL.createObjectURL(compressed)
 }
 
 async function uploadAvatar(petId: string) {
@@ -91,6 +125,7 @@ async function submit() {
   if (nameError.value || avatarError.value || submitting.value) return
   submitting.value = true
   formError.value = ''
+  let pet: Pet
   try {
     const body = {
       name: form.value.name.trim(),
@@ -100,7 +135,6 @@ async function submit() {
       weight: form.value.weight ?? 0,
       notes: form.value.notes.trim(),
     }
-    let pet: Pet
     if (isEdit.value && props.pet) {
       const { data } = await api.put(`/pets/${props.pet.id}`, body)
       pet = data
@@ -108,14 +142,24 @@ async function submit() {
       const { data } = await api.post('/pets', body)
       pet = data
     }
-    await uploadAvatar(pet.id)
-    emit('update:show', false)
-    emit('saved', pet)
   } catch (err) {
     formError.value = (err as Error).message
-  } finally {
     submitting.value = false
+    return
   }
+
+  // 宠物已保存成功，头像上传失败不影响保存结果
+  let avatarFail = ''
+  try {
+    await uploadAvatar(pet.id)
+  } catch (err) {
+    avatarFail = (err as Error).message
+  }
+
+  submitting.value = false
+  emit('update:show', false)
+  emit('saved', pet)
+  if (avatarFail) ui.showBanner(`头像上传失败：${avatarFail}`)
 }
 </script>
 
@@ -139,7 +183,7 @@ async function submit() {
           </svg>
         </div>
       </div>
-      <div class="avatar-tip">点击上传头像（不超过 2MB）</div>
+      <div class="avatar-tip">点击上传头像（自动压缩）</div>
       <div v-if="avatarError" class="field-error">{{ avatarError }}</div>
       <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
     </div>

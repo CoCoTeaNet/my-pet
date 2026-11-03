@@ -155,6 +155,10 @@ function confirmDelete() {
       </div>
     </div>
 
+    <button type="button" class="delete-btn anim-item" style="--i: 3" @click="confirmDelete">
+      删除宠物
+    </button>
+
     <pet-form-modal v-model:show="showForm" :pet="pet" @saved="onEdited" />
   </div>
 </template>
@@ -345,5 +349,22 @@ function confirmDelete() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.delete-btn {
+  display: block;
+  width: 100%;
+  margin-top: 24px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  border: 1px solid rgba(224, 86, 76, 0.24);
+  color: var(--danger);
+  font-size: 15px;
+  transition: background 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.delete-btn:active {
+  background: #fff5f4;
 }
 </style>
