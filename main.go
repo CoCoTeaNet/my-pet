@@ -53,6 +53,7 @@ func main() {
 	{
 		auth.GET("/auth/me", h.Me)
 		auth.PUT("/auth/password", h.ChangePassword)
+		auth.PUT("/auth/featured-pet", h.SetFeaturedPet)
 
 		auth.GET("/pets", h.ListPets)
 		auth.GET("/pets/:id", h.GetPet)

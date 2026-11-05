@@ -5,6 +5,7 @@ import api from '@/api'
 import type { Pet } from '@/types'
 import { useUiStore } from '@/stores/ui'
 import { resolveUrl } from '@/platform'
+import { ageText } from '@/utils/time'
 
 const props = defineProps<{ show: boolean; pet: Pet | null }>()
 const emit = defineEmits<{
@@ -20,9 +21,11 @@ const form = ref({
   breed: '',
   gender: '' as '' | 'male' | 'female',
   birth_date: '',
+  adoption_date: '',
   weight: null as number | null,
   notes: '',
 })
+const birthAge = computed(() => ageText(form.value.birth_date))
 const nameError = ref('')
 const avatarError = ref('')
 const formError = ref('')
@@ -45,12 +48,21 @@ watch(
         breed: props.pet.breed || '',
         gender: (props.pet.gender || '') as '' | 'male' | 'female',
         birth_date: props.pet.birth_date || '',
+        adoption_date: props.pet.adoption_date || '',
         weight: props.pet.weight ?? null,
         notes: props.pet.notes || '',
       }
       avatarPreview.value = resolveUrl(props.pet.avatar_url || '')
     } else {
-      form.value = { name: '', breed: '', gender: '', birth_date: '', weight: null, notes: '' }
+      form.value = {
+        name: '',
+        breed: '',
+        gender: '',
+        birth_date: '',
+        adoption_date: '',
+        weight: null,
+        notes: '',
+      }
       avatarPreview.value = ''
     }
   },
@@ -132,6 +144,7 @@ async function submit() {
       breed: form.value.breed.trim(),
       gender: form.value.gender,
       birth_date: form.value.birth_date || '',
+      adoption_date: form.value.adoption_date || '',
       weight: form.value.weight ?? 0,
       notes: form.value.notes.trim(),
     }
@@ -208,13 +221,26 @@ async function submit() {
     </div>
 
     <div class="field-item">
-      <label class="field-label">出生日期</label>
+      <label class="field-label">生日</label>
       <n-date-picker
         v-model:formatted-value="form.birth_date"
         type="date"
         value-format="yyyy-MM-dd"
         clearable
-        placeholder="选择出生日期"
+        placeholder="选择生日"
+        style="width: 100%"
+      />
+      <div v-if="birthAge" class="field-hint">当前年龄：{{ birthAge }}</div>
+    </div>
+
+    <div class="field-item">
+      <label class="field-label">领养日期</label>
+      <n-date-picker
+        v-model:formatted-value="form.adoption_date"
+        type="date"
+        value-format="yyyy-MM-dd"
+        clearable
+        placeholder="选择领养日期"
         style="width: 100%"
       />
     </div>
@@ -264,6 +290,12 @@ async function submit() {
 
 .required {
   color: var(--danger);
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-top: 4px;
 }
 
 .form-error {

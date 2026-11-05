@@ -23,17 +23,18 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 }
 
 type Pet struct {
-	ID        string    `gorm:"primaryKey;size:36" json:"id"`
-	OwnerID   string    `gorm:"index;size:36" json:"owner_id"`
-	Name      string    `gorm:"size:100;not null" json:"name"`
-	Breed     string    `gorm:"size:100" json:"breed"`
-	Gender    string    `gorm:"size:10" json:"gender"`
-	BirthDate string    `gorm:"size:20" json:"birth_date"`
-	Weight    float64   `json:"weight"`
-	AvatarURL string    `gorm:"size:255" json:"avatar_url"`
-	Notes     string    `gorm:"type:text" json:"notes"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           string    `gorm:"primaryKey;size:36" json:"id"`
+	OwnerID      string    `gorm:"index;size:36" json:"owner_id"`
+	Name         string    `gorm:"size:100;not null" json:"name"`
+	Breed        string    `gorm:"size:100" json:"breed"`
+	Gender       string    `gorm:"size:10" json:"gender"`
+	BirthDate    string    `gorm:"size:20" json:"birth_date"`
+	AdoptionDate string    `gorm:"size:20" json:"adoption_date"`
+	Weight       float64   `json:"weight"`
+	AvatarURL    string    `gorm:"size:255" json:"avatar_url"`
+	Notes        string    `gorm:"type:text" json:"notes"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type PetStats struct {
@@ -74,11 +75,12 @@ type LogEntry struct {
 }
 
 type User struct {
-	ID           string    `gorm:"primaryKey;size:36" json:"id"`
-	Username     string    `gorm:"uniqueIndex;size:50;not null" json:"username"`
-	PasswordHash string    `gorm:"size:100;not null" json:"-"`
-	Role         string    `gorm:"size:10;not null" json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            string    `gorm:"primaryKey;size:36" json:"id"`
+	Username      string    `gorm:"uniqueIndex;size:50;not null" json:"username"`
+	PasswordHash  string    `gorm:"size:100;not null" json:"-"`
+	Role          string    `gorm:"size:10;not null" json:"role"`
+	FeaturedPetID string    `gorm:"size:36" json:"featured_pet_id"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type Setting struct {

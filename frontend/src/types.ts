@@ -4,6 +4,7 @@ export interface UserInfo {
   id: string
   username: string
   role: UserRole
+  featured_pet_id?: string
   created_at?: string
 }
 
@@ -13,6 +14,7 @@ export interface Pet {
   breed: string
   gender: '' | 'male' | 'female'
   birth_date: string
+  adoption_date: string
   weight: number | null
   avatar_url: string
   notes: string

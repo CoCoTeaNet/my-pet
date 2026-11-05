@@ -17,12 +17,13 @@ var avatarDir = "./data/avatars"
 const maxAvatarSize = 2 << 20 // 2MB
 
 type petReq struct {
-	Name      string   `json:"name"`
-	Breed     string   `json:"breed"`
-	Gender    string   `json:"gender"`
-	BirthDate string   `json:"birth_date"`
-	Weight    *float64 `json:"weight"`
-	Notes     string   `json:"notes"`
+	Name         string   `json:"name"`
+	Breed        string   `json:"breed"`
+	Gender       string   `json:"gender"`
+	BirthDate    string   `json:"birth_date"`
+	AdoptionDate string   `json:"adoption_date"`
+	Weight       *float64 `json:"weight"`
+	Notes        string   `json:"notes"`
 }
 
 func newID() string { return model.NewID() }
@@ -45,13 +46,14 @@ func (h *Handler) CreatePet(c *gin.Context) {
 		req.Gender = ""
 	}
 	pet := model.Pet{
-		ID:        newID(),
-		OwnerID:   currentUserID(c),
-		Name:      strings.TrimSpace(req.Name),
-		Breed:     req.Breed,
-		Gender:    req.Gender,
-		BirthDate: req.BirthDate,
-		Notes:     req.Notes,
+		ID:           newID(),
+		OwnerID:      currentUserID(c),
+		Name:         strings.TrimSpace(req.Name),
+		Breed:        req.Breed,
+		Gender:       req.Gender,
+		BirthDate:    req.BirthDate,
+		AdoptionDate: req.AdoptionDate,
+		Notes:        req.Notes,
 	}
 	if req.Weight != nil {
 		pet.Weight = *req.Weight
@@ -92,7 +94,8 @@ func (h *Handler) GetPet(c *gin.Context) {
 	h.DB.Model(&model.Reminder{}).Where("pet_id = ?", pet.ID).Count(&stats.ReminderCount)
 	c.JSON(http.StatusOK, gin.H{
 		"id": pet.ID, "name": pet.Name, "breed": pet.Breed, "gender": pet.Gender,
-		"birth_date": pet.BirthDate, "weight": pet.Weight, "avatar_url": pet.AvatarURL,
+		"birth_date": pet.BirthDate, "adoption_date": pet.AdoptionDate,
+		"weight": pet.Weight, "avatar_url": pet.AvatarURL,
 		"notes": pet.Notes, "created_at": pet.CreatedAt,
 		"feed_count": stats.FeedCount, "log_count": stats.LogCount, "reminder_count": stats.ReminderCount,
 	})
@@ -123,6 +126,7 @@ func (h *Handler) UpdatePet(c *gin.Context) {
 	pet.Breed = req.Breed
 	pet.Gender = req.Gender
 	pet.BirthDate = req.BirthDate
+	pet.AdoptionDate = req.AdoptionDate
 	pet.Notes = req.Notes
 	if req.Weight != nil {
 		pet.Weight = *req.Weight
@@ -150,6 +154,7 @@ func (h *Handler) DeletePet(c *gin.Context) {
 		h.fail(c, http.StatusInternalServerError, "删除失败，请重试")
 		return
 	}
+	h.DB.Model(&model.User{}).Where("featured_pet_id = ?", id).Update("featured_pet_id", "")
 	if pet.AvatarURL != "" {
 		name := filepath.Base(pet.AvatarURL)
 		os.Remove(filepath.Join(avatarDir, name))

@@ -118,6 +118,28 @@ func (h *Handler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// SetFeaturedPet 保存首页默认展示的宠物；传空串表示清除
+func (h *Handler) SetFeaturedPet(c *gin.Context) {
+	var req struct {
+		PetID string `json:"pet_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.fail(c, http.StatusBadRequest, "请求格式不正确")
+		return
+	}
+	uid := currentUserID(c)
+	if req.PetID != "" && !h.ownsPet(c, req.PetID) {
+		h.fail(c, http.StatusNotFound, "宠物不存在或已被删除")
+		return
+	}
+	if err := h.DB.Model(&model.User{}).Where("id = ?", uid).
+		Update("featured_pet_id", req.PetID).Error; err != nil {
+		h.fail(c, http.StatusInternalServerError, "保存失败，请重试")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"featured_pet_id": req.PetID})
+}
+
 func validatePassword(p string) string {
 	if len(p) < 8 {
 		return "密码至少 8 位"

@@ -26,6 +26,11 @@ export const useAuthStore = defineStore('auth', {
       localStorage.setItem(TOKEN_KEY, token)
       localStorage.setItem(USER_KEY, JSON.stringify(user))
     },
+    setFeaturedPet(petId: string) {
+      if (!this.user) return
+      this.user = { ...this.user, featured_pet_id: petId }
+      localStorage.setItem(USER_KEY, JSON.stringify(this.user))
+    },
     clear() {
       this.token = ''
       this.user = null

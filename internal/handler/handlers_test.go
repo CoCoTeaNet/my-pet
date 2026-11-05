@@ -45,6 +45,7 @@ func setupTest(t *testing.T) (*Handler, *gin.Engine) {
 	auth := api.Group("", middleware.RequireAuth())
 	{
 		auth.GET("/auth/me", h.Me)
+		auth.PUT("/auth/featured-pet", h.SetFeaturedPet)
 		auth.GET("/pets", h.ListPets)
 		auth.GET("/pets/:id", h.GetPet)
 		auth.POST("/pets", h.CreatePet)
@@ -208,6 +209,53 @@ func TestPetCRUDAndCascade(t *testing.T) {
 	code, body = doReq(t, r, "GET", "/api/pets/"+pet.ID, "", admin)
 	if code != 404 {
 		t.Fatalf("get after delete: %d %s", code, body)
+	}
+}
+
+func TestPetDatesAndFeaturedPet(t *testing.T) {
+	h, r := setupTest(t)
+	u := &model.User{ID: newID(), Username: "featured-user", Role: "member"}
+	if err := h.DB.Create(u).Error; err != nil {
+		t.Fatal(err)
+	}
+	token := tokenFor(t, u)
+
+	code, body := doReq(t, r, "POST", "/api/pets",
+		`{"name":"团子","birth_date":"2024-03-02","adoption_date":"2024-05-01"}`, token)
+	if code != 200 || !strings.Contains(body, `"adoption_date":"2024-05-01"`) {
+		t.Fatalf("create with dates: %d %s", code, body)
+	}
+	var pet struct {
+		ID string `json:"id"`
+	}
+	json.Unmarshal([]byte(body), &pet)
+
+	code, body = doReq(t, r, "GET", "/api/pets/"+pet.ID, "", token)
+	if code != 200 || !strings.Contains(body, `"birth_date":"2024-03-02"`) ||
+		!strings.Contains(body, `"adoption_date":"2024-05-01"`) {
+		t.Fatalf("get dates: %d %s", code, body)
+	}
+
+	code, body = doReq(t, r, "PUT", "/api/auth/featured-pet", `{"pet_id":"`+pet.ID+`"}`, token)
+	if code != 200 || !strings.Contains(body, pet.ID) {
+		t.Fatalf("set featured: %d %s", code, body)
+	}
+	var saved model.User
+	h.DB.First(&saved, "id = ?", u.ID)
+	if saved.FeaturedPetID != pet.ID {
+		t.Fatalf("featured not saved: %q", saved.FeaturedPetID)
+	}
+
+	other := &model.User{ID: newID(), Username: "featured-other", Role: "member"}
+	h.DB.Create(other)
+	if code, _ = doReq(t, r, "PUT", "/api/auth/featured-pet", `{"pet_id":"`+pet.ID+`"}`, tokenFor(t, other)); code != 404 {
+		t.Fatalf("other user's pet should be 404, got %d", code)
+	}
+
+	doReq(t, r, "DELETE", "/api/pets/"+pet.ID, "", token)
+	h.DB.First(&saved, "id = ?", u.ID)
+	if saved.FeaturedPetID != "" {
+		t.Fatalf("featured should be cleared after delete: %q", saved.FeaturedPetID)
 	}
 }
 
@@ -522,7 +570,9 @@ func TestEdgeCases(t *testing.T) {
 	}
 	// 分页参数
 	_, body := doReq(t, r, "POST", "/api/pets", `{"name":"A"}`, admin)
-	var pet struct{ ID string `json:"id"` }
+	var pet struct {
+		ID string `json:"id"`
+	}
 	json.Unmarshal([]byte(body), &pet)
 	for i := 0; i < 5; i++ {
 		doReq(t, r, "POST", "/api/pets/"+pet.ID+"/logs", `{"content":"条目"}`, admin)
