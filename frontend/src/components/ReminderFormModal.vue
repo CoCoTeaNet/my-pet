@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { NDrawer, NDrawerContent, NInput, NInputNumber, NDatePicker, NButton } from 'naive-ui'
+import { computed, ref, watch } from 'vue'
+import { NInput, NInputNumber, NButton } from 'naive-ui'
+import DateField from '@/components/DateField.vue'
 import api from '@/api'
 import type { Reminder } from '@/types'
 import { useUiStore } from '@/stores/ui'
@@ -84,6 +85,17 @@ function validateDue() {
   dueError.value = dueStr.value ? '' : '请选择首次执行日期'
 }
 
+function close() {
+  emit('update:show', false)
+}
+
+const dueValue = computed({
+  get: () => dueStr.value.replace(' ', 'T'),
+  set: (v: string) => {
+    dueStr.value = v.replace('T', ' ')
+  },
+})
+
 async function submit() {
   validateDue()
   const days = isCustom.value ? customDays.value : intervalDays.value
@@ -118,8 +130,19 @@ async function submit() {
 </script>
 
 <template>
-  <n-drawer :show="show" placement="bottom" height="auto" @update:show="emit('update:show', $event)">
-    <n-drawer-content :title="isEdit() ? '编辑提醒' : '新建提醒'" closable body-content-style="padding: 16px 24px 24px;">
+  <teleport to="body">
+    <div v-if="show" class="sheet-mask" @click.self="close">
+      <div class="sheet" role="dialog" aria-modal="true">
+        <div class="sheet-header">
+          <span class="sheet-title">{{ isEdit() ? '编辑提醒' : '新建提醒' }}</span>
+          <button type="button" class="sheet-close" aria-label="关闭" @click="close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="sheet-body">
       <div class="field-item">
         <label class="field-label">类型</label>
         <div class="chip-group">
@@ -160,15 +183,7 @@ async function submit() {
 
       <div class="field-item">
         <label class="field-label">首次执行日期</label>
-        <n-date-picker
-          v-model:formatted-value="dueStr"
-          type="datetime"
-          value-format="yyyy-MM-dd HH:mm"
-          clearable
-          placeholder="选择日期和时间"
-          style="width: 100%"
-          @blur="validateDue"
-        />
+        <date-field v-model="dueValue" type="datetime-local" />
         <div v-if="dueError" class="field-error">{{ dueError }}</div>
       </div>
 
@@ -180,11 +195,99 @@ async function submit() {
       <div v-if="formError" class="field-error">{{ formError }}</div>
 
       <n-button type="primary" block :loading="submitting" class="submit-btn" @click="submit">保存</n-button>
-    </n-drawer-content>
-  </n-drawer>
+        </div>
+      </div>
+    </div>
+  </teleport>
 </template>
 
 <style scoped>
+.sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.45);
+  animation: sheet-fade 0.2s ease;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  animation: sheet-up 0.24s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 4px;
+}
+
+.sheet-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sheet-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--text-mid);
+}
+
+.sheet-close:hover {
+  background: #f5f5f5;
+}
+
+.sheet-body {
+  padding: 8px 20px 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (min-width: 640px) {
+  .sheet-mask {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .sheet {
+    max-width: 520px;
+    border-radius: 12px;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
 .custom-days {
   display: flex;
   align-items: center;

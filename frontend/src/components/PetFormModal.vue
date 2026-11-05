@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { NModal, NInput, NInputNumber, NDatePicker, NButton } from 'naive-ui'
+import { NModal, NInput, NInputNumber, NButton } from 'naive-ui'
+import DateField from '@/components/DateField.vue'
 import api from '@/api'
 import type { Pet } from '@/types'
 import { useUiStore } from '@/stores/ui'
@@ -222,27 +223,13 @@ async function submit() {
 
     <div class="field-item">
       <label class="field-label">生日</label>
-      <n-date-picker
-        v-model:formatted-value="form.birth_date"
-        type="date"
-        value-format="yyyy-MM-dd"
-        clearable
-        placeholder="选择生日"
-        style="width: 100%"
-      />
+      <date-field v-model="form.birth_date" type="date" />
       <div v-if="birthAge" class="field-hint">当前年龄：{{ birthAge }}</div>
     </div>
 
     <div class="field-item">
       <label class="field-label">领养日期</label>
-      <n-date-picker
-        v-model:formatted-value="form.adoption_date"
-        type="date"
-        value-format="yyyy-MM-dd"
-        clearable
-        placeholder="选择领养日期"
-        style="width: 100%"
-      />
+      <date-field v-model="form.adoption_date" type="date" />
     </div>
 
     <div class="field-item">
